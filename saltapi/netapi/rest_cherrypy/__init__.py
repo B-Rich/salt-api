@@ -61,6 +61,20 @@ def __virtual__():
 
     return False
 
+class SomeotherException(Exception):
+    pass
+
+class RedirectSSLAdapter(wsgiserver.ssl_builtin.BuiltinSSLAdapter):
+    def wrap(self, sock):
+        '''
+        A wrapper subclass to catch NoSSLError exceptions so that we can
+        redirect users from HTTP to HTTPS
+        '''
+        try:
+            return super(RedirectSSLAdapter, self).wrap(sock)
+        except wsgiserver.NoSSLError:
+            raise SomeotherException()
+
 def verify_certs(self, *args):
     '''
     Sanity checking for the specified SSL certificates
@@ -89,8 +103,7 @@ def start():
         # Mount and start the WSGI app using the production CherryPy server
         verify_certs(apiopts['ssl_crt'], apiopts['ssl_key'])
 
-        ssl_a = wsgiserver.ssl_builtin.BuiltinSSLAdapter(
-                apiopts['ssl_crt'], apiopts['ssl_key'])
+        ssl_a = RedirectSSLAdapter(apiopts['ssl_crt'], apiopts['ssl_key'])
         wsgi_d = wsgiserver.WSGIPathInfoDispatcher({'/': application})
         server = wsgiserver.CherryPyWSGIServer(
                 ('0.0.0.0', apiopts['port']),
